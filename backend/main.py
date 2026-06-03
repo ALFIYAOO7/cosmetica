@@ -15,7 +15,9 @@ app.add_middleware(CORSMiddleware, allow_origins=[
 frontend_path = os.path.join(os.path.dirname(__file__), "..", "frontend")
 app.mount("/static", StaticFiles(directory=os.path.join(frontend_path,
           "static")), name="static")
-genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
+api_key = os.environ.get("GEMINI_API_KEY")
+print(f"GEMINI_API_KEY present: {bool(api_key)}")
+genai.configure(api_key=api_key)
 
 
 def clean_json(text):
@@ -45,6 +47,8 @@ Safety score: 90-100=Excellent, 70-89=Good, 50-69=Fair, 30-49=Poor, 0-29=Dangero
         response = model.generate_content([prompt, image_part])
         return json.loads(clean_json(response.text))
     except Exception as e:
+        import traceback
+        print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=str(e))
 
 
