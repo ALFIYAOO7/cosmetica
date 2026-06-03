@@ -45,7 +45,7 @@ async def analyze_product(file: UploadFile = File(...)):
 Respond ONLY with raw JSON, no markdown, no code blocks:
 {"product_name":"Brand Product Name","safety_score":75,"safety_rating":"Good","is_vegan":true,"is_cruelty_free":true,"ingredients":[{"name":"Water","purpose":"Solvent","safety":"Safe","concern":"","is_toxic":false}],"concerns":["example concern"],"benefits":["example benefit"],"skin_types":["All skin types"],"summary":"Brief analysis here.","recommendation":"Recommendation here."}
 Safety score guide: 90-100=Excellent, 70-89=Good, 50-69=Fair, 30-49=Poor, 0-29=Dangerous. Analyze ALL visible ingredients thoroughly."""
-        model = genai.GenerativeModel("gemini-1.5-flash")
+        model = genai.GenerativeModel("gemini-2.0-flash")
         response = model.generate_content([
             prompt,
             {"mime_type": content_type, "data": b64}
@@ -69,7 +69,7 @@ async def shade_match(file: UploadFile = File(...)):
         prompt = """You are an expert makeup artist. Analyze this person's skin tone.
 Respond ONLY with raw JSON, no markdown, no code blocks:
 {"undertone":"Warm","skin_tone":"Medium","recommended_shades":[{"brand":"MAC","product":"Studio Fix Fluid","shade":"NC35","match_quality":"Perfect"},{"brand":"Fenty Beauty","product":"Pro Filt'r","shade":"240W","match_quality":"Perfect"},{"brand":"NARS","product":"Natural Radiant Longwear","shade":"Syracuse","match_quality":"Great"},{"brand":"Maybelline","product":"Fit Me Matte","shade":"220 Natural Beige","match_quality":"Great"},{"brand":"L'Oreal","product":"True Match","shade":"W3 Warm Beige","match_quality":"Good"}],"foundation_range":"Look for medium shades with warm undertones","tips":["Tip 1","Tip 2","Tip 3"],"summary":"Your skin tone analysis here."}"""
-        model = genai.GenerativeModel("gemini-1.5-flash")
+        model = genai.GenerativeModel("gemini-2.0-flash")
         response = model.generate_content([
             prompt,
             {"mime_type": content_type, "data": b64}
