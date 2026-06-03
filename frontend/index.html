@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cosmetica — Know What's On Your Skin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/css/style.css" />
+</head>
+<body>
+
+  <!-- Ambient background blobs -->
+  <div class="ambient">
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+    <div class="blob blob-3"></div>
+  </div>
+
+  <!-- Header -->
+  <header class="header">
+    <div class="logo">
+      <span class="logo-icon">✦</span>
+      <span class="logo-text">Cosmetica</span>
+    </div>
+    <nav class="nav">
+      <button class="nav-btn active" data-tab="product">Product Scan</button>
+      <button class="nav-btn" data-tab="shade">Shade Match</button>
+    </nav>
+  </header>
+
+  <!-- Hero -->
+  <section class="hero">
+    <p class="hero-eyebrow">AI-Powered Beauty Intelligence</p>
+    <h1 class="hero-title">Know exactly what's<br /><em>on your skin</em></h1>
+    <p class="hero-sub">Upload any cosmetic product or capture it live — we'll decode every ingredient, flag toxins, check vegan status, and score its safety in seconds.</p>
+  </section>
+
+  <!-- Main App -->
+  <main class="app">
+
+    <!-- ── PRODUCT SCAN TAB ── -->
+    <div id="tab-product" class="tab-content active">
+
+      <!-- Upload Area -->
+      <div class="upload-card" id="product-upload-area">
+        <input type="file" id="product-file" accept="image/*" hidden />
+
+        <div class="upload-inner" id="product-drop-zone">
+          <div class="upload-icon">
+            <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
+              <circle cx="20" cy="20" r="19" stroke="currentColor" stroke-width="1.2" stroke-dasharray="3 3"/>
+              <path d="M20 13v14M13 20h14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+          </div>
+          <p class="upload-title">Drop product image here</p>
+          <p class="upload-sub">or choose an option below</p>
+
+          <div class="upload-actions">
+            <button class="btn btn-outline" onclick="document.getElementById('product-file').click()">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              Upload Image
+            </button>
+            <button class="btn btn-outline" id="product-camera-btn">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+              Use Camera
+            </button>
+          </div>
+        </div>
+
+        <!-- Camera preview -->
+        <div class="camera-wrap hidden" id="product-camera-wrap">
+          <video id="product-video" autoplay playsinline></video>
+          <div class="camera-controls">
+            <button class="btn btn-primary" id="product-capture-btn">Capture</button>
+            <button class="btn btn-ghost" id="product-camera-close">Cancel</button>
+          </div>
+        </div>
+
+        <!-- Image preview -->
+        <div class="preview-wrap hidden" id="product-preview-wrap">
+          <img id="product-preview-img" alt="Product preview" />
+          <div class="preview-controls">
+            <button class="btn btn-primary" id="product-analyze-btn">
+              <span class="btn-text">Analyse Product</span>
+              <span class="btn-icon">→</span>
+            </button>
+            <button class="btn btn-ghost" id="product-retake-btn">Change Image</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Loading state -->
+      <div class="loading-state hidden" id="product-loading">
+        <div class="loading-orb"></div>
+        <p class="loading-text">Analysing ingredients<span class="dots"></span></p>
+        <p class="loading-sub">Reading every compound, checking safety databases</p>
+      </div>
+
+      <!-- Results -->
+      <div class="results hidden" id="product-results"></div>
+
+    </div>
+
+    <!-- ── SHADE MATCH TAB ── -->
+    <div id="tab-shade" class="tab-content">
+
+      <div class="shade-intro">
+        <h2 class="section-title">Find Your Perfect Shade</h2>
+        <p class="section-sub">Take a selfie or upload a photo — we'll analyse your skin tone and recommend foundations, concealers, and more across popular brands.</p>
+      </div>
+
+      <div class="upload-card" id="shade-upload-area">
+        <input type="file" id="shade-file" accept="image/*" hidden />
+
+        <div class="upload-inner" id="shade-drop-zone">
+          <div class="upload-icon skin-icon">
+            <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
+              <circle cx="20" cy="16" r="7" stroke="currentColor" stroke-width="1.2"/>
+              <path d="M6 36c0-7.732 6.268-14 14-14s14 6.268 14 14" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+            </svg>
+          </div>
+          <p class="upload-title">Upload your photo</p>
+          <p class="upload-sub">Natural lighting gives the best results</p>
+
+          <div class="upload-actions">
+            <button class="btn btn-outline" onclick="document.getElementById('shade-file').click()">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              Upload Selfie
+            </button>
+            <button class="btn btn-outline" id="shade-camera-btn">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+              Take Selfie
+            </button>
+          </div>
+        </div>
+
+        <div class="camera-wrap hidden" id="shade-camera-wrap">
+          <video id="shade-video" autoplay playsinline></video>
+          <div class="camera-controls">
+            <button class="btn btn-primary" id="shade-capture-btn">Capture</button>
+            <button class="btn btn-ghost" id="shade-camera-close">Cancel</button>
+          </div>
+        </div>
+
+        <div class="preview-wrap hidden" id="shade-preview-wrap">
+          <img id="shade-preview-img" alt="Selfie preview" />
+          <div class="preview-controls">
+            <button class="btn btn-primary" id="shade-analyze-btn">
+              <span class="btn-text">Find My Shade</span>
+              <span class="btn-icon">→</span>
+            </button>
+            <button class="btn btn-ghost" id="shade-retake-btn">Change Photo</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="loading-state hidden" id="shade-loading">
+        <div class="loading-orb"></div>
+        <p class="loading-text">Reading your skin tone<span class="dots"></span></p>
+        <p class="loading-sub">Matching undertones, analysing depth</p>
+      </div>
+
+      <div class="results hidden" id="shade-results"></div>
+
+    </div>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <p>✦ Cosmetica — Powered by Claude AI · For informational purposes only</p>
+  </footer>
+
+  <script src="/static/js/app.js"></script>
+</body>
+</html>

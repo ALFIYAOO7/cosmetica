@@ -1,0 +1,343 @@
+/* ── Cosmetica Frontend JS ── */
+
+const API_BASE = '';   // same origin via FastAPI
+
+// ─── Tab switching ───────────────────────────────────────────────────────────
+document.querySelectorAll('.nav-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById(`tab-${btn.dataset.tab}`).classList.add('active');
+  });
+});
+
+// ─── Generic upload + camera handler factory ─────────────────────────────────
+function setupUploadFlow(prefix, endpoint, renderFn) {
+  const fileInput     = document.getElementById(`${prefix}-file`);
+  const dropZone      = document.getElementById(`${prefix}-drop-zone`);
+  const cameraBtn     = document.getElementById(`${prefix}-camera-btn`);
+  const cameraWrap    = document.getElementById(`${prefix}-camera-wrap`);
+  const video         = document.getElementById(`${prefix}-video`);
+  const captureBtn    = document.getElementById(`${prefix}-capture-btn`);
+  const cameraClose   = document.getElementById(`${prefix}-camera-close`);
+  const previewWrap   = document.getElementById(`${prefix}-preview-wrap`);
+  const previewImg    = document.getElementById(`${prefix}-preview-img`);
+  const analyzeBtn    = document.getElementById(`${prefix}-analyze-btn`);
+  const retakeBtn     = document.getElementById(`${prefix}-retake-btn`);
+  const loadingEl     = document.getElementById(`${prefix}-loading`);
+  const resultsEl     = document.getElementById(`${prefix}-results`);
+
+  let stream = null;
+  let selectedBlob = null;
+
+  // File input
+  fileInput.addEventListener('change', e => {
+    const file = e.target.files[0];
+    if (file) showPreview(file);
+  });
+
+  // Drag & drop
+  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    if (file && file.type.startsWith('image/')) showPreview(file);
+  });
+
+  // Camera
+  cameraBtn.addEventListener('click', async () => {
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
+      video.srcObject = stream;
+      dropZone.classList.add('hidden');
+      cameraWrap.classList.remove('hidden');
+    } catch {
+      alert('Could not access camera. Please allow camera permissions or upload an image instead.');
+    }
+  });
+
+  cameraClose.addEventListener('click', () => stopCamera());
+
+  captureBtn.addEventListener('click', () => {
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext('2d').drawImage(video, 0, 0);
+    canvas.toBlob(blob => {
+      showPreview(blob, true);
+      stopCamera();
+    }, 'image/jpeg', 0.92);
+  });
+
+  function stopCamera() {
+    if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+    cameraWrap.classList.add('hidden');
+    if (!selectedBlob) dropZone.classList.remove('hidden');
+  }
+
+  function showPreview(fileOrBlob, fromCamera = false) {
+    selectedBlob = fileOrBlob;
+    const url = URL.createObjectURL(fileOrBlob);
+    previewImg.src = url;
+    dropZone.classList.add('hidden');
+    previewWrap.classList.remove('hidden');
+    resultsEl.classList.add('hidden');
+    loadingEl.classList.add('hidden');
+  }
+
+  retakeBtn.addEventListener('click', () => {
+    selectedBlob = null;
+    previewWrap.classList.add('hidden');
+    dropZone.classList.remove('hidden');
+    resultsEl.classList.add('hidden');
+    fileInput.value = '';
+  });
+
+  analyzeBtn.addEventListener('click', async () => {
+    if (!selectedBlob) return;
+
+    previewWrap.classList.add('hidden');
+    loadingEl.classList.remove('hidden');
+    resultsEl.classList.add('hidden');
+
+    try {
+      const formData = new FormData();
+      const filename = selectedBlob.name || 'image.jpg';
+      formData.append('file', selectedBlob, filename);
+
+      const res = await fetch(`${API_BASE}${endpoint}`, { method: 'POST', body: formData });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.detail || 'Analysis failed');
+      }
+
+      const data = await res.json();
+      loadingEl.classList.add('hidden');
+      resultsEl.classList.remove('hidden');
+      renderFn(data, resultsEl);
+
+      // Scroll to results
+      setTimeout(() => resultsEl.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+
+    } catch (err) {
+      loadingEl.classList.add('hidden');
+      resultsEl.classList.remove('hidden');
+      resultsEl.innerHTML = `
+        <div style="text-align:center;padding:60px 40px;background:var(--glass);backdrop-filter:blur(16px);border:1px solid var(--border);border-radius:var(--radius)">
+          <p style="font-size:32px;margin-bottom:16px">⚠</p>
+          <p style="font-family:'Cormorant Garamond',serif;font-size:22px;margin-bottom:8px">Analysis failed</p>
+          <p style="color:var(--text-muted);font-size:14px">${err.message}</p>
+          <button class="btn btn-outline" style="margin-top:24px" onclick="location.reload()">Try Again</button>
+        </div>`;
+    }
+  });
+}
+
+// ─── Product Analysis Renderer ───────────────────────────────────────────────
+function renderProductResults(data, container) {
+  const score = data.safety_score || 0;
+  const rating = data.safety_rating || 'Unknown';
+  const circumference = 2 * Math.PI * 54; // r=54
+  const offset = circumference - (score / 100) * circumference;
+  const strokeColor = score >= 70 ? '#5A9E6F' : score >= 50 ? '#C9963A' : '#C05050';
+
+  const ratingBadge = {
+    'Excellent': 'badge-safe',
+    'Good':      'badge-safe',
+    'Fair':      'badge-caution',
+    'Poor':      'badge-danger',
+    'Dangerous': 'badge-danger',
+  }[rating] || 'badge-caution';
+
+  const veganBadge = data.is_vegan
+    ? `<span class="badge badge-vegan">✓ Vegan</span>`
+    : `<span class="badge badge-nvegan">✕ Not Vegan</span>`;
+
+  const cfBadge = data.is_cruelty_free
+    ? `<span class="badge badge-cf">✓ Cruelty-Free</span>`
+    : `<span class="badge badge-nvegan">✕ Animal Tested</span>`;
+
+  const concernsHTML = (data.concerns || []).map(c => `<span class="tag tag-concern">${c}</span>`).join('');
+  const benefitsHTML = (data.benefits || []).map(b => `<span class="tag tag-benefit">${b}</span>`).join('');
+  const skinHTML     = (data.skin_types || []).map(s => `<span class="tag">${s}</span>`).join('');
+
+  const ingredientsHTML = (data.ingredients || []).map(ing => {
+    const safeClass = ing.safety === 'Safe' ? 'safe' : ing.safety === 'Caution' ? 'caution' : 'avoid';
+    const concernHTML = ing.concern ? `<div class="ingredient-concern">⚠ ${ing.concern}</div>` : '';
+    return `
+      <div class="ingredient-row">
+        <div>
+          <div class="ingredient-name">${ing.name}${ing.is_toxic ? ' <span style="color:var(--danger);font-size:11px">●</span>' : ''}</div>
+          <div class="ingredient-purpose">${ing.purpose}</div>
+          ${concernHTML}
+        </div>
+        <div class="ingredient-right">
+          <div class="safety-dot ${safeClass}"></div>
+          <div class="safety-label ${safeClass}">${ing.safety}</div>
+        </div>
+      </div>`;
+  }).join('');
+
+  container.innerHTML = `
+    <!-- Score Card -->
+    <div class="score-card">
+      <div class="product-name">${data.product_name}</div>
+      <div class="score-ring">
+        <svg viewBox="0 0 120 120">
+          <circle class="track" cx="60" cy="60" r="54"/>
+          <circle class="fill" cx="60" cy="60" r="54"
+            stroke="${strokeColor}"
+            stroke-dasharray="${circumference}"
+            stroke-dashoffset="${circumference}"
+            id="score-arc"/>
+        </svg>
+        <div class="score-number">
+          <span style="color:${strokeColor}">${score}</span>
+          <span>/100</span>
+        </div>
+      </div>
+      <div class="score-badges">
+        <span class="badge ${ratingBadge}">${rating}</span>
+        ${veganBadge}
+        ${cfBadge}
+      </div>
+    </div>
+
+    <!-- Info Grid -->
+    <div class="info-grid">
+      ${concernsHTML ? `
+      <div class="info-card">
+        <div class="info-card-title">⚠ Concerns</div>
+        <div class="tag-list">${concernsHTML}</div>
+      </div>` : ''}
+      ${benefitsHTML ? `
+      <div class="info-card">
+        <div class="info-card-title">✓ Benefits</div>
+        <div class="tag-list">${benefitsHTML}</div>
+      </div>` : ''}
+      ${skinHTML ? `
+      <div class="info-card">
+        <div class="info-card-title">Skin Types</div>
+        <div class="tag-list">${skinHTML}</div>
+      </div>` : ''}
+      <div class="info-card">
+        <div class="info-card-title">Safety Legend</div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <div style="display:flex;align-items:center;gap:8px">
+            <div class="safety-dot safe"></div><span style="font-size:13px;color:var(--text-muted)">Safe — No concerns</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <div class="safety-dot caution"></div><span style="font-size:13px;color:var(--text-muted)">Caution — Use mindfully</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <div class="safety-dot avoid"></div><span style="font-size:13px;color:var(--text-muted)">Avoid — Known risks</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Ingredients -->
+    ${ingredientsHTML ? `
+    <div class="ingredients-card">
+      <div class="ingredients-header">
+        <h3>Ingredient Breakdown</h3>
+        <span style="font-size:12px;color:var(--text-light)">${data.ingredients.length} ingredients</span>
+      </div>
+      ${ingredientsHTML}
+    </div>` : ''}
+
+    <!-- Summary -->
+    <div class="summary-card">
+      <p>${data.summary}</p>
+      <p class="recommendation">${data.recommendation}</p>
+    </div>
+
+    <!-- New scan -->
+    <div style="text-align:center;padding:16px 0">
+      <button class="btn btn-outline" id="product-new-scan">
+        ← Scan Another Product
+      </button>
+    </div>
+  `;
+
+  // Animate score arc
+  setTimeout(() => {
+    const arc = document.getElementById('score-arc');
+    if (arc) arc.style.strokeDashoffset = offset;
+  }, 200);
+
+  document.getElementById('product-new-scan').addEventListener('click', () => {
+    container.classList.add('hidden');
+    document.getElementById('product-drop-zone').classList.remove('hidden');
+    document.getElementById('product-preview-wrap').classList.add('hidden');
+    document.getElementById('product-file').value = '';
+  });
+}
+
+// ─── Shade Match Renderer ─────────────────────────────────────────────────────
+function renderShadeResults(data, container) {
+  const shadesHTML = (data.recommended_shades || []).map(s => {
+    const matchClass = s.match_quality === 'Perfect' ? 'match-perfect'
+                     : s.match_quality === 'Great'   ? 'match-great' : 'match-good';
+    return `
+      <div class="shade-item">
+        <div class="shade-brand">${s.brand}</div>
+        <div class="shade-product">${s.product}</div>
+        <div class="shade-name">${s.shade}</div>
+        <span class="shade-match ${matchClass}">${s.match_quality}</span>
+      </div>`;
+  }).join('');
+
+  const tipsHTML = (data.tips || []).map((t, i) => `
+    <div class="tip-item">
+      <div class="tip-num">${i + 1}</div>
+      <div class="tip-text">${t}</div>
+    </div>`).join('');
+
+  container.innerHTML = `
+    <!-- Tone Card -->
+    <div class="tone-card">
+      <div class="tone-label">Your Skin Tone</div>
+      <div class="tone-name">${data.skin_tone}</div>
+      <div class="undertone-badge">${data.undertone} Undertone</div>
+      <p style="font-size:14px;color:var(--text-muted);line-height:1.7;max-width:500px;margin:0 auto">${data.summary}</p>
+    </div>
+
+    <!-- Foundation Range -->
+    ${data.foundation_range ? `
+    <div style="background:var(--glass);backdrop-filter:blur(16px);border:1px solid var(--border);border-radius:var(--radius-sm);padding:20px 24px;margin-bottom:20px;box-shadow:var(--shadow-sm)">
+      <div style="font-size:10px;font-weight:600;letter-spacing:0.15em;text-transform:uppercase;color:var(--text-light);margin-bottom:8px">Foundation Range Guide</div>
+      <p style="font-size:14px;color:var(--text-muted)">${data.foundation_range}</p>
+    </div>` : ''}
+
+    <!-- Shades -->
+    <div style="font-size:10px;font-weight:600;letter-spacing:0.15em;text-transform:uppercase;color:var(--text-light);margin-bottom:14px">Recommended Shades</div>
+    <div class="shades-grid">${shadesHTML}</div>
+
+    <!-- Tips -->
+    <div class="tips-card">
+      <h3>Personalised Tips</h3>
+      ${tipsHTML}
+    </div>
+
+    <!-- New scan -->
+    <div style="text-align:center;padding:16px 0">
+      <button class="btn btn-outline" id="shade-new-scan">← Try Another Photo</button>
+    </div>
+  `;
+
+  document.getElementById('shade-new-scan').addEventListener('click', () => {
+    container.classList.add('hidden');
+    document.getElementById('shade-drop-zone').classList.remove('hidden');
+    document.getElementById('shade-preview-wrap').classList.add('hidden');
+    document.getElementById('shade-file').value = '';
+  });
+}
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+setupUploadFlow('product', '/api/analyze-product', renderProductResults);
+setupUploadFlow('shade',   '/api/shade-match',      renderShadeResults);
