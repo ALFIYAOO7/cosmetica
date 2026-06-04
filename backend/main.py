@@ -31,7 +31,7 @@ def call_openrouter(prompt, b64_image, content_type):
             "Content-Type": "application/json"
         },
         json={
-            "model": "meta-llama/llama-4-maverick:free",
+            "model": "openrouter/free",
             "messages": [{
                 "role": "user",
                 "content": [
