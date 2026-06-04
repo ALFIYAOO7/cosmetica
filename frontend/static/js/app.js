@@ -1,8 +1,8 @@
 /* ── Cosmetica Frontend JS ── */
 
-const API_BASE = '';   // same origin via FastAPI
+const API_BASE = '';
 
-// ─── Tab switching ───────────────────────────────────────────────────────────
+// ─── Tab switching ────────────────────────────────────────────────────────────
 document.querySelectorAll('.nav-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
@@ -12,8 +12,18 @@ document.querySelectorAll('.nav-btn').forEach(btn => {
   });
 });
 
-// ─── Generic upload + camera handler factory ─────────────────────────────────
-function setupUploadFlow(prefix, endpoint, renderFn) {
+// ─── Category selector ────────────────────────────────────────────────────────
+let selectedCategory = 'full';
+document.querySelectorAll('.cat-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    selectedCategory = btn.dataset.cat;
+  });
+});
+
+// ─── Generic upload + camera handler factory ──────────────────────────────────
+function setupUploadFlow(prefix, endpoint, renderFn, getCat) {
   const fileInput = document.getElementById(`${prefix}-file`);
   const dropZone = document.getElementById(`${prefix}-drop-zone`);
   const cameraBtn = document.getElementById(`${prefix}-camera-btn`);
@@ -31,13 +41,11 @@ function setupUploadFlow(prefix, endpoint, renderFn) {
   let stream = null;
   let selectedBlob = null;
 
-  // File input
   fileInput.addEventListener('change', e => {
     const file = e.target.files[0];
     if (file) showPreview(file);
   });
 
-  // Drag & drop
   dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
   dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
   dropZone.addEventListener('drop', e => {
@@ -47,7 +55,6 @@ function setupUploadFlow(prefix, endpoint, renderFn) {
     if (file && file.type.startsWith('image/')) showPreview(file);
   });
 
-  // Camera
   cameraBtn.addEventListener('click', async () => {
     try {
       stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
@@ -66,10 +73,7 @@ function setupUploadFlow(prefix, endpoint, renderFn) {
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
     canvas.getContext('2d').drawImage(video, 0, 0);
-    canvas.toBlob(blob => {
-      showPreview(blob, true);
-      stopCamera();
-    }, 'image/jpeg', 0.92);
+    canvas.toBlob(blob => { showPreview(blob, true); stopCamera(); }, 'image/jpeg', 0.92);
   });
 
   function stopCamera() {
@@ -78,10 +82,9 @@ function setupUploadFlow(prefix, endpoint, renderFn) {
     if (!selectedBlob) dropZone.classList.remove('hidden');
   }
 
-  function showPreview(fileOrBlob, fromCamera = false) {
+  function showPreview(fileOrBlob) {
     selectedBlob = fileOrBlob;
-    const url = URL.createObjectURL(fileOrBlob);
-    previewImg.src = url;
+    previewImg.src = URL.createObjectURL(fileOrBlob);
     dropZone.classList.add('hidden');
     previewWrap.classList.remove('hidden');
     resultsEl.classList.add('hidden');
@@ -98,18 +101,16 @@ function setupUploadFlow(prefix, endpoint, renderFn) {
 
   analyzeBtn.addEventListener('click', async () => {
     if (!selectedBlob) return;
-
     previewWrap.classList.add('hidden');
     loadingEl.classList.remove('hidden');
     resultsEl.classList.add('hidden');
 
     try {
       const formData = new FormData();
-      const filename = selectedBlob.name || 'image.jpg';
-      formData.append('file', selectedBlob, filename);
+      formData.append('file', selectedBlob, selectedBlob.name || 'image.jpg');
+      if (getCat) formData.append('category', getCat());
 
       const res = await fetch(`${API_BASE}${endpoint}`, { method: 'POST', body: formData });
-
       if (!res.ok) {
         const err = await res.json();
         throw new Error(err.detail || 'Analysis failed');
@@ -119,8 +120,6 @@ function setupUploadFlow(prefix, endpoint, renderFn) {
       loadingEl.classList.add('hidden');
       resultsEl.classList.remove('hidden');
       renderFn(data, resultsEl);
-
-      // Scroll to results
       setTimeout(() => resultsEl.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
 
     } catch (err) {
@@ -137,34 +136,19 @@ function setupUploadFlow(prefix, endpoint, renderFn) {
   });
 }
 
-// ─── Product Analysis Renderer ───────────────────────────────────────────────
+// ─── Product Analysis Renderer ────────────────────────────────────────────────
 function renderProductResults(data, container) {
   const score = data.safety_score || 0;
   const rating = data.safety_rating || 'Unknown';
-  const circumference = 2 * Math.PI * 54; // r=54
+  const circumference = 2 * Math.PI * 54;
   const offset = circumference - (score / 100) * circumference;
   const strokeColor = score >= 70 ? '#5A9E6F' : score >= 50 ? '#C9963A' : '#C05050';
-
-  const ratingBadge = {
-    'Excellent': 'badge-safe',
-    'Good': 'badge-safe',
-    'Fair': 'badge-caution',
-    'Poor': 'badge-danger',
-    'Dangerous': 'badge-danger',
-  }[rating] || 'badge-caution';
-
-  const veganBadge = data.is_vegan
-    ? `<span class="badge badge-vegan">✓ Vegan</span>`
-    : `<span class="badge badge-nvegan">✕ Not Vegan</span>`;
-
-  const cfBadge = data.is_cruelty_free
-    ? `<span class="badge badge-cf">✓ Cruelty-Free</span>`
-    : `<span class="badge badge-nvegan">✕ Animal Tested</span>`;
-
+  const ratingBadge = { 'Excellent': 'badge-safe', 'Good': 'badge-safe', 'Fair': 'badge-caution', 'Poor': 'badge-danger', 'Dangerous': 'badge-danger' }[rating] || 'badge-caution';
+  const veganBadge = data.is_vegan ? `<span class="badge badge-vegan">✓ Vegan</span>` : `<span class="badge badge-nvegan">✕ Not Vegan</span>`;
+  const cfBadge = data.is_cruelty_free ? `<span class="badge badge-cf">✓ Cruelty-Free</span>` : `<span class="badge badge-nvegan">✕ Animal Tested</span>`;
   const concernsHTML = (data.concerns || []).map(c => `<span class="tag tag-concern">${c}</span>`).join('');
   const benefitsHTML = (data.benefits || []).map(b => `<span class="tag tag-benefit">${b}</span>`).join('');
   const skinHTML = (data.skin_types || []).map(s => `<span class="tag">${s}</span>`).join('');
-
   const ingredientsHTML = (data.ingredients || []).map(ing => {
     const safeClass = ing.safety === 'Safe' ? 'safe' : ing.safety === 'Caution' ? 'caution' : 'avoid';
     const concernHTML = ing.concern ? `<div class="ingredient-concern">⚠ ${ing.concern}</div>` : '';
@@ -183,17 +167,12 @@ function renderProductResults(data, container) {
   }).join('');
 
   container.innerHTML = `
-    <!-- Score Card -->
     <div class="score-card">
       <div class="product-name">${data.product_name}</div>
       <div class="score-ring">
         <svg viewBox="0 0 120 120">
           <circle class="track" cx="60" cy="60" r="54"/>
-          <circle class="fill" cx="60" cy="60" r="54"
-            stroke="${strokeColor}"
-            stroke-dasharray="${circumference}"
-            stroke-dashoffset="${circumference}"
-            id="score-arc"/>
+          <circle class="fill" cx="60" cy="60" r="54" stroke="${strokeColor}" stroke-dasharray="${circumference}" stroke-dashoffset="${circumference}" id="score-arc"/>
         </svg>
         <div class="score-number">
           <span style="color:${strokeColor}">${score}</span>
@@ -206,41 +185,19 @@ function renderProductResults(data, container) {
         ${cfBadge}
       </div>
     </div>
-
-    <!-- Info Grid -->
     <div class="info-grid">
-      ${concernsHTML ? `
-      <div class="info-card">
-        <div class="info-card-title">⚠ Concerns</div>
-        <div class="tag-list">${concernsHTML}</div>
-      </div>` : ''}
-      ${benefitsHTML ? `
-      <div class="info-card">
-        <div class="info-card-title">✓ Benefits</div>
-        <div class="tag-list">${benefitsHTML}</div>
-      </div>` : ''}
-      ${skinHTML ? `
-      <div class="info-card">
-        <div class="info-card-title">Skin Types</div>
-        <div class="tag-list">${skinHTML}</div>
-      </div>` : ''}
+      ${concernsHTML ? `<div class="info-card"><div class="info-card-title">⚠ Concerns</div><div class="tag-list">${concernsHTML}</div></div>` : ''}
+      ${benefitsHTML ? `<div class="info-card"><div class="info-card-title">✓ Benefits</div><div class="tag-list">${benefitsHTML}</div></div>` : ''}
+      ${skinHTML ? `<div class="info-card"><div class="info-card-title">Skin Types</div><div class="tag-list">${skinHTML}</div></div>` : ''}
       <div class="info-card">
         <div class="info-card-title">Safety Legend</div>
         <div style="display:flex;flex-direction:column;gap:8px">
-          <div style="display:flex;align-items:center;gap:8px">
-            <div class="safety-dot safe"></div><span style="font-size:13px;color:var(--text-muted)">Safe — No concerns</span>
-          </div>
-          <div style="display:flex;align-items:center;gap:8px">
-            <div class="safety-dot caution"></div><span style="font-size:13px;color:var(--text-muted)">Caution — Use mindfully</span>
-          </div>
-          <div style="display:flex;align-items:center;gap:8px">
-            <div class="safety-dot avoid"></div><span style="font-size:13px;color:var(--text-muted)">Avoid — Known risks</span>
-          </div>
+          <div style="display:flex;align-items:center;gap:8px"><div class="safety-dot safe"></div><span style="font-size:13px;color:var(--text-muted)">Safe — No concerns</span></div>
+          <div style="display:flex;align-items:center;gap:8px"><div class="safety-dot caution"></div><span style="font-size:13px;color:var(--text-muted)">Caution — Use mindfully</span></div>
+          <div style="display:flex;align-items:center;gap:8px"><div class="safety-dot avoid"></div><span style="font-size:13px;color:var(--text-muted)">Avoid — Known risks</span></div>
         </div>
       </div>
     </div>
-
-    <!-- Ingredients -->
     ${ingredientsHTML ? `
     <div class="ingredients-card">
       <div class="ingredients-header">
@@ -249,22 +206,14 @@ function renderProductResults(data, container) {
       </div>
       ${ingredientsHTML}
     </div>` : ''}
-
-    <!-- Summary -->
     <div class="summary-card">
       <p>${data.summary}</p>
       <p class="recommendation">${data.recommendation}</p>
     </div>
-
-    <!-- New scan -->
     <div style="text-align:center;padding:16px 0">
-      <button class="btn btn-outline" id="product-new-scan">
-        ← Scan Another Product
-      </button>
-    </div>
-  `;
+      <button class="btn btn-outline" id="product-new-scan">← Scan Another Product</button>
+    </div>`;
 
-  // Animate score arc
   setTimeout(() => {
     const arc = document.getElementById('score-arc');
     if (arc) arc.style.strokeDashoffset = offset;
@@ -280,43 +229,40 @@ function renderProductResults(data, container) {
 
 // ─── Shade Match Renderer ─────────────────────────────────────────────────────
 function renderShadeResults(data, container) {
-  function renderShadeResults(data, container) {
-    function makeSection(title, emoji, items) {
-      if (!items || items.length === 0) return '';
-      const cards = items.map(s => {
-        const matchClass = s.match_quality === 'Perfect' ? 'match-perfect'
-          : s.match_quality === 'Great' ? 'match-great' : 'match-good';
-        return `
+  function makeSection(title, emoji, items) {
+    if (!items || items.length === 0) return '';
+    const cards = items.map(s => {
+      const matchClass = s.match_quality === 'Perfect' ? 'match-perfect' : s.match_quality === 'Great' ? 'match-great' : 'match-good';
+      return `
         <div class="shade-item">
           <div class="shade-brand">${s.brand}</div>
           <div class="shade-product">${s.product}</div>
           <div class="shade-name">${s.shade}</div>
           <span class="shade-match ${matchClass}">${s.match_quality}</span>
         </div>`;
-      }).join('');
-      return `
+    }).join('');
+    return `
       <div style="margin-bottom:28px">
         <div style="font-size:11px;font-weight:600;letter-spacing:0.15em;text-transform:uppercase;color:var(--text-light);margin-bottom:12px">${emoji} ${title}</div>
         <div class="shades-grid">${cards}</div>
       </div>`;
-    }
+  }
 
-    const tipsHTML = (data.tips || []).map((t, i) => `
+  const tipsHTML = (data.tips || []).map((t, i) => `
     <div class="tip-item">
       <div class="tip-num">${i + 1}</div>
       <div class="tip-text">${t}</div>
     </div>`).join('');
 
-    container.innerHTML = `
+  container.innerHTML = `
     <div class="tone-card">
       <div class="tone-label">Your Skin Tone</div>
       <div class="tone-name">${data.skin_tone}</div>
       <div class="undertone-badge">${data.undertone} Undertone</div>
       <p style="font-size:14px;color:var(--text-muted);line-height:1.7;max-width:500px;margin:0 auto">${data.summary}</p>
     </div>
-
     <div style="background:var(--glass);backdrop-filter:blur(16px);border:1px solid var(--border);border-radius:var(--radius);padding:32px;margin-bottom:20px;box-shadow:var(--shadow-sm)">
-      <h3 style="font-family:'Cormorant Garamond',serif;font-size:24px;font-weight:400;margin-bottom:24px">Your Complete Makeup Profile</h3>
+      <h3 style="font-family:'Cormorant Garamond',serif;font-size:24px;font-weight:400;margin-bottom:24px">Your Makeup Profile</h3>
       ${makeSection('Foundation', '🫧', data.foundation)}
       ${makeSection('Concealer', '✨', data.concealer)}
       ${makeSection('Blush', '🌸', data.blush)}
@@ -325,26 +271,22 @@ function renderShadeResults(data, container) {
       ${makeSection('Lip Colour', '💄', data.lipcolour)}
       ${makeSection('Highlighter', '⭐', data.highlighter)}
     </div>
-
     <div class="tips-card">
       <h3>Personalised Tips</h3>
       ${tipsHTML}
     </div>
-
     <div style="text-align:center;padding:16px 0">
       <button class="btn btn-outline" id="shade-new-scan">← Try Another Photo</button>
-    </div>
-  `;
+    </div>`;
 
-    document.getElementById('shade-new-scan').addEventListener('click', () => {
-      container.classList.add('hidden');
-      document.getElementById('shade-drop-zone').classList.remove('hidden');
-      document.getElementById('shade-preview-wrap').classList.add('hidden');
-      document.getElementById('shade-file').value = '';
-    });
-  }
+  document.getElementById('shade-new-scan').addEventListener('click', () => {
+    container.classList.add('hidden');
+    document.getElementById('shade-drop-zone').classList.remove('hidden');
+    document.getElementById('shade-preview-wrap').classList.add('hidden');
+    document.getElementById('shade-file').value = '';
+  });
 }
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 setupUploadFlow('product', '/api/analyze-product', renderProductResults);
-setupUploadFlow('shade', '/api/shade-match', renderShadeResults);
+setupUploadFlow('shade', '/api/shade-match', renderShadeResults, () => selectedCategory);
