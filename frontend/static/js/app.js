@@ -210,6 +210,18 @@ function renderProductResults(data, container) {
       <p>${data.summary}</p>
       <p class="recommendation">${data.recommendation}</p>
     </div>
+    <div class="summary-card" style="margin-top:20px">
+      <div style="font-size:10px;font-weight:600;letter-spacing:0.15em;text-transform:uppercase;color:var(--text-light);margin-bottom:14px">🛍️ Find Safer Alternatives</div>
+      <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px">Enter your budget to find better products in the Indian market</p>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px">
+        <input type="number" id="min-price" placeholder="Min ₹" style="width:100px;padding:8px 12px;border:1px solid var(--border);border-radius:50px;font-family:'DM Sans',sans-serif;font-size:13px;background:var(--warm-white);color:var(--text);outline:none"/>
+        <span style="color:var(--text-muted);font-size:13px">to</span>
+        <input type="number" id="max-price" placeholder="Max ₹" style="width:100px;padding:8px 12px;border:1px solid var(--border);border-radius:50px;font-family:'DM Sans',sans-serif;font-size:13px;background:var(--warm-white);color:var(--text);outline:none"/>
+        <button class="btn btn-primary" id="find-alternatives-btn">Find Alternatives</button>
+      </div>
+      <div id="alternatives-results"></div>
+    </div>
+
     <div style="text-align:center;padding:16px 0">
       <button class="btn btn-outline" id="product-new-scan">← Scan Another Product</button>
     </div>`;
@@ -224,6 +236,39 @@ function renderProductResults(data, container) {
     document.getElementById('product-drop-zone').classList.remove('hidden');
     document.getElementById('product-preview-wrap').classList.add('hidden');
     document.getElementById('product-file').value = '';
+  });
+
+  document.getElementById('find-alternatives-btn').addEventListener('click', async () => {
+    const min = document.getElementById('min-price').value;
+    const max = document.getElementById('max-price').value;
+    const altResults = document.getElementById('alternatives-results');
+    if (!min || !max) { altResults.innerHTML = `<p style="color:var(--danger);font-size:13px">Please enter both min and max price</p>`; return; }
+    altResults.innerHTML = `<p style="font-size:13px;color:var(--text-muted);padding:12px 0">Finding alternatives<span class="dots"></span></p>`;
+    try {
+      const formData = new FormData();
+      formData.append('product_name', data.product_name);
+      formData.append('safety_rating', data.safety_rating);
+      formData.append('min_price', min);
+      formData.append('max_price', max);
+      const res = await fetch('/api/alternatives', { method: 'POST', body: formData });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.detail);
+      const cards = (result.alternatives || []).map(a => `
+        <div style="padding:16px;border:1px solid var(--border);border-radius:var(--radius-sm);margin-bottom:10px;background:var(--warm-white)">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
+            <div>
+              <div style="font-size:13px;font-weight:500;color:var(--text)">${a.brand} — ${a.name}</div>
+              <div style="font-size:12px;color:var(--rose);font-weight:600">${a.price}</div>
+            </div>
+            <span class="badge badge-safe" style="font-size:10px">${a.safety_rating}</span>
+          </div>
+          <div style="font-size:12px;color:var(--text-muted);margin-bottom:4px">✓ ${a.why_better}</div>
+          <div style="font-size:11px;color:var(--text-light)">🛒 ${a.where_to_buy}</div>
+        </div>`).join('');
+      altResults.innerHTML = cards || `<p style="font-size:13px;color:var(--text-muted)">No alternatives found in this range.</p>`;
+    } catch (e) {
+      altResults.innerHTML = `<p style="color:var(--danger);font-size:13px">${e.message}</p>`;
+    }
   });
 }
 

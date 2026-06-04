@@ -139,6 +139,44 @@ Be accurate and specific to the person's actual skin tone in the image."""
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.post("/api/alternatives")
+async def find_alternatives(
+    product_name: str = Form(...),
+    safety_rating: str = Form(...),
+    min_price: str = Form(...),
+    max_price: str = Form(...)
+):
+    try:
+        prompt = f"""You are a cosmetic product expert. The user has a product called "{product_name}" with safety rating "{safety_rating}".
+Suggest 4-5 safer alternative products within price range ₹{min_price} to ₹{max_price}.
+Respond ONLY with raw JSON, no markdown:
+{{"alternatives":[{{"name":"Product Name","brand":"Brand","price":"₹299","safety_rating":"Excellent","why_better":"reason it is safer","where_to_buy":"Nykaa / Amazon / Flipkart"}}]}}
+Be specific with real Indian market products. Only suggest products genuinely available in India in that price range."""
+
+        response = requests.post(
+            "https://openrouter.ai/api/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {os.environ.get('OPENROUTER_API_KEY')}",
+                "Content-Type": "application/json"
+            },
+            json={
+                "model": "openrouter/free",
+                "messages": [{"role": "user", "content": prompt}],
+                "max_tokens": 1000
+            },
+            timeout=60
+        )
+        data = response.json()
+        if "error" in data:
+            raise Exception(f"OpenRouter error: {data['error']}")
+        text = data["choices"][0]["message"]["content"]
+        return json.loads(clean_json(text))
+    except Exception as e:
+        import traceback
+        print("ERROR:", traceback.format_exc())
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/api/health")
 async def health():
     return {"status": "ok"}
