@@ -45,7 +45,11 @@ def call_openrouter(prompt, b64_image, content_type):
         timeout=60
     )
     data = response.json()
-    print("OpenRouter response:", str(data)[:300])
+    print("OpenRouter full response:", json.dumps(data)[:500])
+    if "error" in data:
+        raise Exception(f"OpenRouter error: {data['error']}")
+    if "choices" not in data:
+        raise Exception(f"Unexpected response: {json.dumps(data)[:200]}")
     return data["choices"][0]["message"]["content"]
 
 
