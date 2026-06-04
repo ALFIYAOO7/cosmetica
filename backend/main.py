@@ -31,7 +31,7 @@ def call_openrouter(prompt, b64_image, content_type):
             "Content-Type": "application/json"
         },
         json={
-            "model": "google/gemma-4-31b-it:free",
+            "model": "meta-llama/llama-4-maverick:free",
             "messages": [{
                 "role": "user",
                 "content": [
