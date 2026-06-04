@@ -14,19 +14,19 @@ document.querySelectorAll('.nav-btn').forEach(btn => {
 
 // ─── Generic upload + camera handler factory ─────────────────────────────────
 function setupUploadFlow(prefix, endpoint, renderFn) {
-  const fileInput     = document.getElementById(`${prefix}-file`);
-  const dropZone      = document.getElementById(`${prefix}-drop-zone`);
-  const cameraBtn     = document.getElementById(`${prefix}-camera-btn`);
-  const cameraWrap    = document.getElementById(`${prefix}-camera-wrap`);
-  const video         = document.getElementById(`${prefix}-video`);
-  const captureBtn    = document.getElementById(`${prefix}-capture-btn`);
-  const cameraClose   = document.getElementById(`${prefix}-camera-close`);
-  const previewWrap   = document.getElementById(`${prefix}-preview-wrap`);
-  const previewImg    = document.getElementById(`${prefix}-preview-img`);
-  const analyzeBtn    = document.getElementById(`${prefix}-analyze-btn`);
-  const retakeBtn     = document.getElementById(`${prefix}-retake-btn`);
-  const loadingEl     = document.getElementById(`${prefix}-loading`);
-  const resultsEl     = document.getElementById(`${prefix}-results`);
+  const fileInput = document.getElementById(`${prefix}-file`);
+  const dropZone = document.getElementById(`${prefix}-drop-zone`);
+  const cameraBtn = document.getElementById(`${prefix}-camera-btn`);
+  const cameraWrap = document.getElementById(`${prefix}-camera-wrap`);
+  const video = document.getElementById(`${prefix}-video`);
+  const captureBtn = document.getElementById(`${prefix}-capture-btn`);
+  const cameraClose = document.getElementById(`${prefix}-camera-close`);
+  const previewWrap = document.getElementById(`${prefix}-preview-wrap`);
+  const previewImg = document.getElementById(`${prefix}-preview-img`);
+  const analyzeBtn = document.getElementById(`${prefix}-analyze-btn`);
+  const retakeBtn = document.getElementById(`${prefix}-retake-btn`);
+  const loadingEl = document.getElementById(`${prefix}-loading`);
+  const resultsEl = document.getElementById(`${prefix}-results`);
 
   let stream = null;
   let selectedBlob = null;
@@ -147,9 +147,9 @@ function renderProductResults(data, container) {
 
   const ratingBadge = {
     'Excellent': 'badge-safe',
-    'Good':      'badge-safe',
-    'Fair':      'badge-caution',
-    'Poor':      'badge-danger',
+    'Good': 'badge-safe',
+    'Fair': 'badge-caution',
+    'Poor': 'badge-danger',
     'Dangerous': 'badge-danger',
   }[rating] || 'badge-caution';
 
@@ -163,7 +163,7 @@ function renderProductResults(data, container) {
 
   const concernsHTML = (data.concerns || []).map(c => `<span class="tag tag-concern">${c}</span>`).join('');
   const benefitsHTML = (data.benefits || []).map(b => `<span class="tag tag-benefit">${b}</span>`).join('');
-  const skinHTML     = (data.skin_types || []).map(s => `<span class="tag">${s}</span>`).join('');
+  const skinHTML = (data.skin_types || []).map(s => `<span class="tag">${s}</span>`).join('');
 
   const ingredientsHTML = (data.ingredients || []).map(ing => {
     const safeClass = ing.safety === 'Safe' ? 'safe' : ing.safety === 'Caution' ? 'caution' : 'avoid';
@@ -280,26 +280,34 @@ function renderProductResults(data, container) {
 
 // ─── Shade Match Renderer ─────────────────────────────────────────────────────
 function renderShadeResults(data, container) {
-  const shadesHTML = (data.recommended_shades || []).map(s => {
-    const matchClass = s.match_quality === 'Perfect' ? 'match-perfect'
-                     : s.match_quality === 'Great'   ? 'match-great' : 'match-good';
-    return `
-      <div class="shade-item">
-        <div class="shade-brand">${s.brand}</div>
-        <div class="shade-product">${s.product}</div>
-        <div class="shade-name">${s.shade}</div>
-        <span class="shade-match ${matchClass}">${s.match_quality}</span>
+  function renderShadeResults(data, container) {
+    function makeSection(title, emoji, items) {
+      if (!items || items.length === 0) return '';
+      const cards = items.map(s => {
+        const matchClass = s.match_quality === 'Perfect' ? 'match-perfect'
+          : s.match_quality === 'Great' ? 'match-great' : 'match-good';
+        return `
+        <div class="shade-item">
+          <div class="shade-brand">${s.brand}</div>
+          <div class="shade-product">${s.product}</div>
+          <div class="shade-name">${s.shade}</div>
+          <span class="shade-match ${matchClass}">${s.match_quality}</span>
+        </div>`;
+      }).join('');
+      return `
+      <div style="margin-bottom:28px">
+        <div style="font-size:11px;font-weight:600;letter-spacing:0.15em;text-transform:uppercase;color:var(--text-light);margin-bottom:12px">${emoji} ${title}</div>
+        <div class="shades-grid">${cards}</div>
       </div>`;
-  }).join('');
+    }
 
-  const tipsHTML = (data.tips || []).map((t, i) => `
+    const tipsHTML = (data.tips || []).map((t, i) => `
     <div class="tip-item">
       <div class="tip-num">${i + 1}</div>
       <div class="tip-text">${t}</div>
     </div>`).join('');
 
-  container.innerHTML = `
-    <!-- Tone Card -->
+    container.innerHTML = `
     <div class="tone-card">
       <div class="tone-label">Your Skin Tone</div>
       <div class="tone-name">${data.skin_tone}</div>
@@ -307,37 +315,36 @@ function renderShadeResults(data, container) {
       <p style="font-size:14px;color:var(--text-muted);line-height:1.7;max-width:500px;margin:0 auto">${data.summary}</p>
     </div>
 
-    <!-- Foundation Range -->
-    ${data.foundation_range ? `
-    <div style="background:var(--glass);backdrop-filter:blur(16px);border:1px solid var(--border);border-radius:var(--radius-sm);padding:20px 24px;margin-bottom:20px;box-shadow:var(--shadow-sm)">
-      <div style="font-size:10px;font-weight:600;letter-spacing:0.15em;text-transform:uppercase;color:var(--text-light);margin-bottom:8px">Foundation Range Guide</div>
-      <p style="font-size:14px;color:var(--text-muted)">${data.foundation_range}</p>
-    </div>` : ''}
+    <div style="background:var(--glass);backdrop-filter:blur(16px);border:1px solid var(--border);border-radius:var(--radius);padding:32px;margin-bottom:20px;box-shadow:var(--shadow-sm)">
+      <h3 style="font-family:'Cormorant Garamond',serif;font-size:24px;font-weight:400;margin-bottom:24px">Your Complete Makeup Profile</h3>
+      ${makeSection('Foundation', '🫧', data.foundation)}
+      ${makeSection('Concealer', '✨', data.concealer)}
+      ${makeSection('Blush', '🌸', data.blush)}
+      ${makeSection('Bronzer', '☀️', data.bronzer)}
+      ${makeSection('Eyeshadow', '👁️', data.eyeshadow)}
+      ${makeSection('Lip Colour', '💄', data.lipcolour)}
+      ${makeSection('Highlighter', '⭐', data.highlighter)}
+    </div>
 
-    <!-- Shades -->
-    <div style="font-size:10px;font-weight:600;letter-spacing:0.15em;text-transform:uppercase;color:var(--text-light);margin-bottom:14px">Recommended Shades</div>
-    <div class="shades-grid">${shadesHTML}</div>
-
-    <!-- Tips -->
     <div class="tips-card">
       <h3>Personalised Tips</h3>
       ${tipsHTML}
     </div>
 
-    <!-- New scan -->
     <div style="text-align:center;padding:16px 0">
       <button class="btn btn-outline" id="shade-new-scan">← Try Another Photo</button>
     </div>
   `;
 
-  document.getElementById('shade-new-scan').addEventListener('click', () => {
-    container.classList.add('hidden');
-    document.getElementById('shade-drop-zone').classList.remove('hidden');
-    document.getElementById('shade-preview-wrap').classList.add('hidden');
-    document.getElementById('shade-file').value = '';
-  });
+    document.getElementById('shade-new-scan').addEventListener('click', () => {
+      container.classList.add('hidden');
+      document.getElementById('shade-drop-zone').classList.remove('hidden');
+      document.getElementById('shade-preview-wrap').classList.add('hidden');
+      document.getElementById('shade-file').value = '';
+    });
+  }
 }
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 setupUploadFlow('product', '/api/analyze-product', renderProductResults);
-setupUploadFlow('shade',   '/api/shade-match',      renderShadeResults);
+setupUploadFlow('shade', '/api/shade-match', renderShadeResults);

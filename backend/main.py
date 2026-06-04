@@ -40,12 +40,12 @@ def call_openrouter(prompt, b64_image, content_type):
                         "url": f"data:{content_type};base64,{b64_image}"}}
                 ]
             }],
-            "max_tokens": 2000
+            "max_tokens": 2500
         },
         timeout=60
     )
     data = response.json()
-    print("OpenRouter full response:", json.dumps(data)[:500])
+    print("OpenRouter response:", json.dumps(data)[:300])
     if "error" in data:
         raise Exception(f"OpenRouter error: {data['error']}")
     if "choices" not in data:
@@ -86,10 +86,51 @@ async def shade_match(file: UploadFile = File(...)):
         if content_type not in ["image/jpeg", "image/png", "image/gif", "image/webp"]:
             content_type = "image/jpeg"
         b64 = base64.b64encode(contents).decode("utf-8")
-        prompt = """You are an expert makeup artist. Analyze this person's skin tone from the image.
+        prompt = """You are an expert professional makeup artist. Analyze this person's skin tone, undertone, and features from the image.
 Respond ONLY with raw JSON, no markdown, no code blocks:
-{"undertone":"Warm","skin_tone":"Medium","recommended_shades":[{"brand":"MAC","product":"Studio Fix Fluid","shade":"NC35","match_quality":"Perfect"},{"brand":"Fenty Beauty","product":"Pro Filt'r Soft Matte","shade":"240W","match_quality":"Perfect"},{"brand":"NARS","product":"Natural Radiant Longwear","shade":"Syracuse","match_quality":"Great"},{"brand":"Maybelline","product":"Fit Me Matte","shade":"220 Natural Beige","match_quality":"Great"},{"brand":"L'Oreal","product":"True Match","shade":"W3 Warm Beige","match_quality":"Good"}],"foundation_range":"Medium shades with warm undertones","tips":["Tip 1","Tip 2","Tip 3"],"summary":"Personalized skin tone analysis."}
-Include 5-6 shades from popular brands."""
+{
+  "undertone": "Warm",
+  "skin_tone": "Medium",
+  "summary": "Personalized skin tone analysis in 2 sentences.",
+  "foundation": [
+    {"brand":"MAC","product":"Studio Fix Fluid","shade":"NC35","match_quality":"Perfect"},
+    {"brand":"Fenty Beauty","product":"Pro Filt'r Soft Matte","shade":"240W","match_quality":"Perfect"},
+    {"brand":"Maybelline","product":"Fit Me Matte","shade":"220 Natural Beige","match_quality":"Great"},
+    {"brand":"L'Oreal","product":"True Match","shade":"W3 Warm Beige","match_quality":"Good"}
+  ],
+  "concealer": [
+    {"brand":"NARS","product":"Radiant Creamy Concealer","shade":"Caramel","match_quality":"Perfect"},
+    {"brand":"Maybelline","product":"Fit Me Concealer","shade":"25 Medium","match_quality":"Great"}
+  ],
+  "blush": [
+    {"brand":"NARS","product":"Blush","shade":"Orgasm","match_quality":"Perfect"},
+    {"brand":"Rare Beauty","product":"Soft Pinch Liquid Blush","shade":"Joy","match_quality":"Great"}
+  ],
+  "bronzer": [
+    {"brand":"Too Faced","product":"Chocolate Soleil","shade":"Medium Deep","match_quality":"Perfect"},
+    {"brand":"Fenty Beauty","product":"Sun Stalkr Bronzer","shade":"Caramel Honeysnap","match_quality":"Great"}
+  ],
+  "eyeshadow": [
+    {"brand":"Urban Decay","product":"Naked3 Palette","shade":"Rose tones","match_quality":"Perfect"},
+    {"brand":"Charlotte Tilbury","product":"Luxury Palette","shade":"The Dolce Vita","match_quality":"Great"}
+  ],
+  "lipcolour": [
+    {"brand":"MAC","product":"Matte Lipstick","shade":"Velvet Teddy","match_quality":"Perfect"},
+    {"brand":"Charlotte Tilbury","product":"Matte Revolution","shade":"Pillow Talk","match_quality":"Perfect"},
+    {"brand":"NYX","product":"Soft Matte Lip Cream","shade":"Rome","match_quality":"Great"}
+  ],
+  "highlighter": [
+    {"brand":"Fenty Beauty","product":"Killawatt Highlighter","shade":"Mean Money","match_quality":"Perfect"},
+    {"brand":"Becca","product":"Shimmering Skin Perfector","shade":"Champagne Pop","match_quality":"Great"}
+  ],
+  "tips": [
+    "Tip 1 specific to this skin tone",
+    "Tip 2 specific to this skin tone",
+    "Tip 3 specific to this skin tone",
+    "Tip 4 specific to this skin tone"
+  ]
+}
+Be accurate and specific to the person's actual skin tone in the image."""
         text = call_openrouter(prompt, b64, content_type)
         return json.loads(clean_json(text))
     except Exception as e:
