@@ -31,7 +31,7 @@ def call_openrouter(prompt, b64_image, content_type):
             "Content-Type": "application/json"
         },
         json={
-            "model": "google/gemini-2.0-flash-exp:free",
+            "model": "google/gemini-2.0-flash-lite-001:free",
             "messages": [{
                 "role": "user",
                 "content": [
