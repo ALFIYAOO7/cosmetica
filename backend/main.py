@@ -25,34 +25,35 @@ def clean_json(text):
     return text.strip()
 
 
-def call_openrouter(prompt, b64_image, content_type):
+def call_groq(prompt):
     response = requests.post(
-        "https://openrouter.ai/api/v1/chat/completions",
+        "https://api.groq.com/openai/v1/chat/completions",
         headers={
-            "Authorization": f"Bearer {os.environ.get('OPENROUTER_API_KEY')}",
-            "Content-Type": "application/json"
-        },
-        json={
-            "model": "openrouter/free",
-            "messages": [{
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": prompt},
-                    {"type": "image_url", "image_url": {
-                        "url": f"data:{content_type};base64,{b64_image}"}}
-                ]
-            }],
-            "max_tokens": 2500
-        },
+            "Authorization": f"Bearer {os.environ.get('GROQ_API_KEY')}", "Content-Type": "application/json"},
+        json={"model": "llama-3.3-70b-versatile", "messages": [
+            {"role": "user", "content": prompt}], "max_tokens": 2000, "temperature": 0.3},
         timeout=60
     )
     data = response.json()
-    print("OpenRouter response:", json.dumps(data)[:300])
+    print("Groq response:", json.dumps(data)[:300])
     if "error" in data:
-        raise Exception(f"OpenRouter error: {data['error']}")
-    if "choices" not in data:
-        raise Exception(f"Unexpected response: {json.dumps(data)[:200]}")
+        raise Exception(f"Groq error: {data['error']}")
     return data["choices"][0]["message"]["content"]
+
+
+def call_hf_vision(b64_image):
+    image_bytes = base64.b64decode(b64_image)
+    response = requests.post(
+        "https://api-inference.huggingface.co/models/Salesforce/blip-image-captioning-large",
+        headers={"Authorization": f"Bearer {os.environ.get('HF_API_KEY')}"},
+        data=image_bytes,
+        timeout=60
+    )
+    result = response.json()
+    print("HF response:", str(result)[:300])
+    if isinstance(result, list) and len(result) > 0:
+        return result[0].get("generated_text", "a person with medium skin tone")
+    return "a person with medium skin tone"
 
 
 @app.get("/")
@@ -61,18 +62,13 @@ async def serve_frontend():
 
 
 @app.post("/api/analyze-product")
-async def analyze_product(file: UploadFile = File(...)):
+async def analyze_product(product_name: str = Form(...)):
     try:
-        contents = await file.read()
-        content_type = file.content_type or "image/jpeg"
-        if content_type not in ["image/jpeg", "image/png", "image/gif", "image/webp"]:
-            content_type = "image/jpeg"
-        b64 = base64.b64encode(contents).decode("utf-8")
-        prompt = """You are an expert cosmetic chemist and safety analyst. Analyze this cosmetic product image carefully.
+        prompt = f"""You are an expert cosmetic chemist and safety analyst. Analyze the cosmetic product: "{product_name}"
 Respond ONLY with raw JSON, no markdown, no code blocks:
-{"product_name":"Brand Product Name","safety_score":75,"safety_rating":"Good","is_vegan":true,"is_cruelty_free":true,"ingredients":[{"name":"Water","purpose":"Solvent base","safety":"Safe","concern":"","is_toxic":false},{"name":"Glycerin","purpose":"Moisturizer","safety":"Safe","concern":"","is_toxic":false}],"concerns":["example concern"],"benefits":["example benefit"],"skin_types":["All skin types"],"summary":"Brief 2-3 sentence analysis.","recommendation":"Clear recommendation for users."}
-Safety score: 90-100=Excellent, 70-89=Good, 50-69=Fair, 30-49=Poor, 0-29=Dangerous. Analyze ALL visible ingredients."""
-        text = call_openrouter(prompt, b64, content_type)
+{{"product_name":"{product_name}","safety_score":75,"safety_rating":"Good","is_vegan":true,"is_cruelty_free":true,"ingredients":[{{"name":"Water","purpose":"Solvent base","safety":"Safe","concern":"","is_toxic":false}},{{"name":"Glycerin","purpose":"Moisturizer","safety":"Safe","concern":"","is_toxic":false}}],"concerns":["example concern"],"benefits":["example benefit"],"skin_types":["All skin types"],"summary":"Brief 2-3 sentence analysis.","recommendation":"Clear recommendation for users."}}
+Safety score: 90-100=Excellent, 70-89=Good, 50-69=Fair, 30-49=Poor, 0-29=Dangerous. Be thorough and accurate."""
+        text = call_groq(prompt)
         return json.loads(clean_json(text))
     except Exception as e:
         import traceback
@@ -88,23 +84,23 @@ async def shade_match(file: UploadFile = File(...), category: str = Form("full")
         if content_type not in ["image/jpeg", "image/png", "image/gif", "image/webp"]:
             content_type = "image/jpeg"
         b64 = base64.b64encode(contents).decode("utf-8")
+        image_description = call_hf_vision(b64)
         category_prompts = {
-            "foundation": "ONLY recommend foundation shades. Only include the 'foundation' array.",
-            "lipcolour": "ONLY recommend lip colour shades (lipstick, lip liner, lip gloss). Only include the 'lipcolour' array.",
-            "eyeshadow": "ONLY recommend eyeshadow palettes. Only include the 'eyeshadow' array.",
+            "foundation": "ONLY recommend foundation shades. Only include 'foundation' array.",
+            "lipcolour": "ONLY recommend lip colours. Only include 'lipcolour' array.",
+            "eyeshadow": "ONLY recommend eyeshadow. Only include 'eyeshadow' array.",
             "blush": "ONLY recommend blush and bronzer. Only include 'blush' and 'bronzer' arrays.",
-            "concealer": "ONLY recommend concealer shades. Only include the 'concealer' array.",
+            "concealer": "ONLY recommend concealer. Only include 'concealer' array.",
             "full": "Recommend ALL categories."
         }
         cat_instruction = category_prompts.get(
             category, category_prompts["full"])
-
-        prompt = f"""You are an expert professional makeup artist. Analyze this person's skin tone from the image.
-{cat_instruction}
-Respond ONLY with raw JSON, no markdown, no code blocks:
-{{"undertone":"Warm","skin_tone":"Medium","summary":"2 sentence analysis.","foundation":[{{"brand":"MAC","product":"Studio Fix","shade":"NC35","match_quality":"Perfect"}}],"concealer":[{{"brand":"NARS","product":"Radiant Creamy","shade":"Caramel","match_quality":"Perfect"}}],"blush":[{{"brand":"NARS","product":"Blush","shade":"Orgasm","match_quality":"Perfect"}}],"bronzer":[{{"brand":"Too Faced","product":"Chocolate Soleil","shade":"Medium","match_quality":"Perfect"}}],"eyeshadow":[{{"brand":"Urban Decay","product":"Naked3","shade":"Rose tones","match_quality":"Perfect"}}],"lipcolour":[{{"brand":"MAC","product":"Matte Lipstick","shade":"Velvet Teddy","match_quality":"Perfect"}}],"highlighter":[{{"brand":"Fenty Beauty","product":"Killawatt","shade":"Mean Money","match_quality":"Perfect"}}],"tips":["Tip 1","Tip 2","Tip 3"]}}
-Only include arrays for the requested category. Leave other arrays empty or omit them."""
-        text = call_openrouter(prompt, b64, content_type)
+        prompt = f"""You are an expert professional makeup artist. Based on this image description: "{image_description}"
+Analyze the person's skin tone and undertone. {cat_instruction}
+Respond ONLY with raw JSON, no markdown:
+{{"undertone":"Warm","skin_tone":"Medium","summary":"2 sentence personalized analysis.","foundation":[{{"brand":"MAC","product":"Studio Fix","shade":"NC35","match_quality":"Perfect"}}],"concealer":[{{"brand":"NARS","product":"Radiant Creamy","shade":"Caramel","match_quality":"Perfect"}}],"blush":[{{"brand":"NARS","product":"Blush","shade":"Orgasm","match_quality":"Perfect"}}],"bronzer":[{{"brand":"Too Faced","product":"Chocolate Soleil","shade":"Medium","match_quality":"Perfect"}}],"eyeshadow":[{{"brand":"Urban Decay","product":"Naked3","shade":"Rose tones","match_quality":"Perfect"}}],"lipcolour":[{{"brand":"MAC","product":"Matte Lipstick","shade":"Velvet Teddy","match_quality":"Perfect"}}],"highlighter":[{{"brand":"Fenty Beauty","product":"Killawatt","shade":"Mean Money","match_quality":"Perfect"}}],"tips":["Tip 1","Tip 2","Tip 3"]}}
+Only populate arrays for the requested category. Give 4-5 real product recommendations."""
+        text = call_groq(prompt)
         return json.loads(clean_json(text))
     except Exception as e:
         import traceback
@@ -113,36 +109,13 @@ Only include arrays for the requested category. Leave other arrays empty or omit
 
 
 @app.post("/api/alternatives")
-async def find_alternatives(
-    product_name: str = Form(...),
-    safety_rating: str = Form(...),
-    min_price: str = Form(...),
-    max_price: str = Form(...)
-):
+async def find_alternatives(product_name: str = Form(...), safety_rating: str = Form(...), min_price: str = Form(...), max_price: str = Form(...)):
     try:
-        prompt = f"""You are a cosmetic product expert. The user has a product called "{product_name}" with safety rating "{safety_rating}".
-Suggest 4-5 safer alternative products within price range ₹{min_price} to ₹{max_price}.
+        prompt = f"""You are a cosmetic product expert. The user has "{product_name}" with safety rating "{safety_rating}".
+Suggest 4-5 safer alternatives within ₹{min_price} to ₹{max_price} available in India.
 Respond ONLY with raw JSON, no markdown:
-{{"alternatives":[{{"name":"Product Name","brand":"Brand","price":"₹299","safety_rating":"Excellent","why_better":"reason it is safer","where_to_buy":"Nykaa / Amazon / Flipkart"}}]}}
-Be specific with real Indian market products. Only suggest products genuinely available in India in that price range."""
-
-        response = requests.post(
-            "https://openrouter.ai/api/v1/chat/completions",
-            headers={
-                "Authorization": f"Bearer {os.environ.get('OPENROUTER_API_KEY')}",
-                "Content-Type": "application/json"
-            },
-            json={
-                "model": "openrouter/free",
-                "messages": [{"role": "user", "content": prompt}],
-                "max_tokens": 1000
-            },
-            timeout=60
-        )
-        data = response.json()
-        if "error" in data:
-            raise Exception(f"OpenRouter error: {data['error']}")
-        text = data["choices"][0]["message"]["content"]
+{{"alternatives":[{{"name":"Product Name","brand":"Brand","price":"₹299","safety_rating":"Excellent","why_better":"reason","where_to_buy":"Nykaa / Amazon"}}]}}"""
+        text = call_groq(prompt)
         return json.loads(clean_json(text))
     except Exception as e:
         import traceback

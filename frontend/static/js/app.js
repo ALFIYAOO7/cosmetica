@@ -380,7 +380,7 @@ productAnalyzeBtn.addEventListener('click', async () => {
     const formData = new FormData();
     formData.append('product_name', name);
     const res = await fetch('/api/analyze-product', { method: 'POST', body: formData });
-    if (!res.ok) { const err = await res.json(); throw new Error(err.detail || 'Failed'); }
+    if (!res.ok) { const err = await res.json(); throw new Error(typeof err.detail === 'string' ? err.detail : JSON.stringify(err.detail)); }
     const data = await res.json();
     productLoading.classList.add('hidden');
     productResults.classList.remove('hidden');
