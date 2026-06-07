@@ -11,9 +11,11 @@ from fastapi.responses import FileResponse
 app = FastAPI()
 app.add_middleware(CORSMiddleware, allow_origins=[
                    "*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
-frontend_path = os.path.join(os.path.dirname(__file__), "..", "frontend")
-app.mount("/static", StaticFiles(directory=os.path.join(frontend_path,
-          "static")), name="static")
+frontend_path = os.path.join(os.path.dirname(
+    os.path.abspath(__file__)), "..", "frontend")
+static_path = os.path.join(os.path.dirname(
+    os.path.abspath(__file__)), "..", "frontend", "static")
+app.mount("/static", StaticFiles(directory=static_path), name="static")
 
 
 def clean_json(text):
