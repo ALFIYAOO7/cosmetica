@@ -104,24 +104,17 @@ function setupUploadFlow(prefix, endpoint, renderFn, getCat) {
     previewWrap.classList.add('hidden');
     loadingEl.classList.remove('hidden');
     resultsEl.classList.add('hidden');
-
     try {
       const formData = new FormData();
       formData.append('file', selectedBlob, selectedBlob.name || 'image.jpg');
       if (getCat) formData.append('category', getCat());
-
       const res = await fetch(`${API_BASE}${endpoint}`, { method: 'POST', body: formData });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.detail || 'Analysis failed');
-      }
-
+      if (!res.ok) { const err = await res.json(); throw new Error(err.detail || 'Analysis failed'); }
       const data = await res.json();
       loadingEl.classList.add('hidden');
       resultsEl.classList.remove('hidden');
       renderFn(data, resultsEl);
       setTimeout(() => resultsEl.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
-
     } catch (err) {
       loadingEl.classList.add('hidden');
       resultsEl.classList.remove('hidden');
@@ -221,7 +214,6 @@ function renderProductResults(data, container) {
       </div>
       <div id="alternatives-results"></div>
     </div>
-
     <div style="text-align:center;padding:16px 0">
       <button class="btn btn-outline" id="product-new-scan">← Scan Another Product</button>
     </div>`;
@@ -233,9 +225,7 @@ function renderProductResults(data, container) {
 
   document.getElementById('product-new-scan').addEventListener('click', () => {
     container.classList.add('hidden');
-    document.getElementById('product-drop-zone').classList.remove('hidden');
-    document.getElementById('product-preview-wrap').classList.add('hidden');
-    document.getElementById('product-file').value = '';
+    document.getElementById('product-name-input').value = '';
   });
 
   document.getElementById('find-alternatives-btn').addEventListener('click', async () => {
@@ -331,7 +321,6 @@ function renderShadeResults(data, container) {
       </div>
       <div id="shade-budget-results"></div>
     </div>
-
     <div style="text-align:center;padding:16px 0">
       <button class="btn btn-outline" id="shade-new-scan">← Try Another Photo</button>
     </div>`;
@@ -377,7 +366,36 @@ function renderShadeResults(data, container) {
   });
 }
 
+// ─── Product scan (text input) ────────────────────────────────────────────────
+const productAnalyzeBtn = document.getElementById('product-analyze-btn');
+const productLoading = document.getElementById('product-loading');
+const productResults = document.getElementById('product-results');
+
+productAnalyzeBtn.addEventListener('click', async () => {
+  const name = document.getElementById('product-name-input').value.trim();
+  if (!name) { alert('Please enter a product name'); return; }
+  productLoading.classList.remove('hidden');
+  productResults.classList.add('hidden');
+  try {
+    const formData = new FormData();
+    formData.append('product_name', name);
+    const res = await fetch('/api/analyze-product', { method: 'POST', body: formData });
+    if (!res.ok) { const err = await res.json(); throw new Error(err.detail || 'Failed'); }
+    const data = await res.json();
+    productLoading.classList.add('hidden');
+    productResults.classList.remove('hidden');
+    renderProductResults(data, productResults);
+    setTimeout(() => productResults.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+  } catch (err) {
+    productLoading.classList.add('hidden');
+    productResults.classList.remove('hidden');
+    productResults.innerHTML = `<div style="text-align:center;padding:60px 40px;background:var(--glass);backdrop-filter:blur(16px);border:1px solid var(--border);border-radius:var(--radius)"><p style="font-size:32px;margin-bottom:16px">⚠</p><p style="font-family:'Cormorant Garamond',serif;font-size:22px;margin-bottom:8px">Analysis failed</p><p style="color:var(--text-muted);font-size:14px">${err.message}</p></div>`;
+  }
+});
+
+document.getElementById('product-name-input').addEventListener('keypress', e => {
+  if (e.key === 'Enter') productAnalyzeBtn.click();
+});
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
-setupUploadFlow('product', '/api/analyze-product', renderProductResults);
 setupUploadFlow('shade', '/api/shade-match', renderShadeResults, () => selectedCategory);
