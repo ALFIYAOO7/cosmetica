@@ -84,7 +84,7 @@ async def shade_match(file: UploadFile = File(...), category: str = Form("full")
         if content_type not in ["image/jpeg", "image/png", "image/gif", "image/webp"]:
             content_type = "image/jpeg"
         b64 = base64.b64encode(contents).decode("utf-8")
-        image_description = call_hf_vision(b64)
+        image_description = "a person's face for skin tone analysis"
         category_prompts = {
             "foundation": "ONLY recommend foundation shades. Only include 'foundation' array.",
             "lipcolour": "ONLY recommend lip colours. Only include 'lipcolour' array.",
